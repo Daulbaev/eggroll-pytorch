@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools >= 45.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eggroll-pytorch"
+version = "0.1.0"
+description = "Unofficial PyTorch implementation of EGGROLL (Evolution Guided General Optimization via Low-rank Learning)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "GPL-3.0-only"}
+authors = [
+    {name = "Unofficial PyTorch Implementation"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "torch>=1.9.0",
+    "numpy>=1.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black>=21.0",
+    "flake8>=3.8",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["eggroll*"]
+
+
+
+
