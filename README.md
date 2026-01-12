@@ -86,31 +86,48 @@ Main trainer class for EGGROLL optimization.
 #### Parameters
 
 - **model** (`nn.Module`): PyTorch model to train. Must have a `forward` method that accepts `(batch, labels=None, is_training=True)` and returns a dict with `'loss'` key.
+
 - **device** (`torch.device`): Device to train on (CPU or CUDA).
+
 - **rank** (`int`, default=30): Rank of low-rank perturbation. Lower rank = less memory but potentially less expressive.
+
 - **sigma** (`float`, default=0.01): Perturbation scale (σ in the paper).
+
 - **learning_rate** (`float`, default=0.001): Learning rate for weight updates (α_t in the paper).
+
 - **n_workers** (`int`, default=30): Number of perturbation samples per iteration (N_workers in the paper).
+
 - **grad_clip** (`float`, optional, default=1.0): Gradient clipping threshold. Set to `None` to disable.
+
 - **use_weighted_loss** (`bool`, default=False): Whether to use weighted loss (not used in standalone version).
+
 - **log_steps** (`int`, default=100): Frequency of logging.
+
 - **save_steps** (`int`, optional): Frequency of checkpoint saving. Set to `None` to disable.
+
 - **results_dir** (`str`, optional): Directory to save checkpoints and logs.
+
 - **normalize_fitness** (`bool`, default=True): Whether to normalize fitness values using z-score (recommended).
+
 - **base_seed** (`int`, default=0): Base random seed for deterministic perturbation generation.
+
 - **optimizer** (`str` or `torch.optim.Optimizer`, optional): Optimizer to use:
-    - `None`: Simple SGD-like update (default, matches original implementation)
-    - `'sgd'`: PyTorch SGD optimizer
-    - `'adam'`: PyTorch Adam optimizer
-    - `'adamw'`: PyTorch AdamW optimizer (recommended, matches JAX default)
-    - `torch.optim.Optimizer`: Pre-initialized optimizer instance
+  - `None`: Simple SGD-like update (default, matches original implementation)
+  - `'sgd'`: PyTorch SGD optimizer
+  - `'adam'`: PyTorch Adam optimizer
+  - `'adamw'`: PyTorch AdamW optimizer (recommended, matches JAX default)
+  - `torch.optim.Optimizer`: Pre-initialized optimizer instance
+
 - **optimizer_kwargs** (`dict`, optional): Additional keyword arguments for optimizer (e.g., `{'betas': (0.9, 0.999)}` for AdamW).
+
 - **noise_reuse** (`int`, default=0): Number of epochs to reuse the same noise. If > 0, epochs are grouped into blocks and share perturbations. For example, `noise_reuse=2` means epochs 0-1 share perturbations, epochs 2-3 share perturbations, etc.
+
 - **group_size** (`int`, default=0): Size of groups for group-wise fitness normalization. If 0, uses global normalization (default). If > 0, fitness values are grouped and normalized within each group (subtract group mean, divide by global std). Must divide `n_workers` evenly. For example, `group_size=4` with `n_workers=8` creates 2 groups of 4 samples each.
 
 #### Methods
 
 - **`train_step(batch)`**: Perform one training step. Returns a dictionary of metrics.
+
 - **`save_checkpoint(checkpoint_name=None)`**: Save model checkpoint.
 
 ### `eggroll_step`
@@ -144,6 +161,7 @@ EGGROLL implements the following update rule (from the paper, formula 8):
 ```
 
 where:
+
 - `µ_t` are the current model parameters
 - `E_{i,t} = (1/√r) * A_{i,t} * B_{i,t}^T` is the low-rank perturbation
 - `f(M)` is the fitness function (typically `-loss`)
@@ -170,7 +188,7 @@ Your PyTorch model must:
 2. Return a dictionary with at least a `'loss'` key
 3. The loss should be a scalar tensor
 
-Example:
+**Example:**
 
 ```python
 class MyModel(nn.Module):
@@ -263,6 +281,7 @@ pytest tests/test_comprehensive.py -v       # Comprehensive scenarios
 This PyTorch implementation is **functionally compatible** with the JAX version for core algorithm behavior, but there are some **known differences**:
 
 ### ✅ Compatible
+
 - Low-rank perturbation structure (A, B matrices)
 - Fitness normalization (z-score)
 - Update formula computation
@@ -270,9 +289,11 @@ This PyTorch implementation is **functionally compatible** with the JAX version 
 - Core training loop
 
 ### ✅ Fully Compatible Features
-1. **Thread ID alternation**: PyTorch alternates sigma sign based on `sample_idx % 2`, matching JAX behavior
-   - Even sample indices (0, 2, 4, ...) use positive sigma
-   - Odd sample indices (1, 3, 5, ...) use negative sigma
+
+**Thread ID alternation**: PyTorch alternates sigma sign based on `sample_idx % 2`, matching JAX behavior
+
+- Even sample indices (0, 2, 4, ...) use positive sigma
+- Odd sample indices (1, 3, 5, ...) use negative sigma
 
 See `tests/COMPATIBILITY.md` for detailed analysis.
 
@@ -283,6 +304,7 @@ See `tests/COMPATIBILITY.md` for detailed analysis.
 **Noise reuse** allows reusing the same random perturbations across multiple epochs.
 
 When `noise_reuse > 0`, the effective epoch used for generating perturbations is `epoch // noise_reuse` instead of the actual `epoch`. This means:
+
 - If `noise_reuse = 2`: epochs 0-1 use the same perturbations, epochs 2-3 use the same perturbations, etc.
 - If `noise_reuse = 0`: each epoch uses different perturbations (default behavior)
 
@@ -301,6 +323,7 @@ trainer = EGGROLLTrainer(
 **Thread ID alternation** alternates the sign of sigma based on the worker thread ID, matching JAX behavior.
 
 When enabled (default, always active):
+
 - Even worker indices (0, 2, 4, ...) use positive sigma: `+sigma`
 - Odd worker indices (1, 3, 5, ...) use negative sigma: `-sigma`
 - This creates pairs of perturbations with opposite signs, which can help with exploration
@@ -312,6 +335,7 @@ This feature is automatically enabled and matches the JAX implementation exactly
 **Group normalization** allows normalizing fitness values within groups instead of globally.
 
 When `group_size > 0`, fitness values are divided into groups, and each group is normalized separately:
+
 - Each group's fitness values have their group mean subtracted
 - All groups use the same global standard deviation (from all raw fitness values)
 - This is useful when you want to compare fitness within groups while maintaining global scale
