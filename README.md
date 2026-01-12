@@ -228,19 +228,6 @@ trainer = EGGROLLTrainer(
 )
 ```
 
-## Citation
-
-If you use this implementation, please cite the original EGGROLL paper:
-
-```bibtex
-@article{eggroll2024,
-  title={EGGROLL: Evolution Guided General Optimization via Low-rank Learning},
-  author={...},
-  journal={...},
-  year={2024}
-}
-```
-
 ## License
 
 This implementation is licensed under GPL-3.0, matching the original JAX implementation.
