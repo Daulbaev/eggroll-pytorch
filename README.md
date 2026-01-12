@@ -270,17 +270,17 @@ This PyTorch implementation is **functionally compatible** with the JAX version 
 - Core training loop
 
 ### ✅ Fully Compatible Features
-1. **Thread ID alternation**: ✅ **NOW SUPPORTED!** PyTorch now alternates sigma sign based on `sample_idx % 2`, matching JAX behavior
+1. **Thread ID alternation**: PyTorch alternates sigma sign based on `sample_idx % 2`, matching JAX behavior
    - Even sample indices (0, 2, 4, ...) use positive sigma
    - Odd sample indices (1, 3, 5, ...) use negative sigma
 
 See `tests/COMPATIBILITY.md` for detailed analysis.
 
-**Impact**: The PyTorch implementation now matches JAX behavior for all major features. Results should be very similar to the JAX version.
+**Impact**: The PyTorch implementation matches JAX behavior for all major features. Results should be very similar to the JAX version.
 
 #### Noise Reuse Feature
 
-**Noise reuse** is now supported! It allows reusing the same random perturbations across multiple epochs.
+**Noise reuse** allows reusing the same random perturbations across multiple epochs.
 
 When `noise_reuse > 0`, the effective epoch used for generating perturbations is `epoch // noise_reuse` instead of the actual `epoch`. This means:
 - If `noise_reuse = 2`: epochs 0-1 use the same perturbations, epochs 2-3 use the same perturbations, etc.
@@ -298,7 +298,7 @@ trainer = EGGROLLTrainer(
 
 #### Thread ID Alternation Feature
 
-**Thread ID alternation** is now supported! It alternates the sign of sigma based on the worker thread ID, matching JAX behavior.
+**Thread ID alternation** alternates the sign of sigma based on the worker thread ID, matching JAX behavior.
 
 When enabled (default, always active):
 - Even worker indices (0, 2, 4, ...) use positive sigma: `+sigma`
@@ -309,7 +309,7 @@ This feature is automatically enabled and matches the JAX implementation exactly
 
 #### Group Normalization Feature
 
-**Group normalization** is now supported! It allows normalizing fitness values within groups instead of globally.
+**Group normalization** allows normalizing fitness values within groups instead of globally.
 
 When `group_size > 0`, fitness values are divided into groups, and each group is normalized separately:
 - Each group's fitness values have their group mean subtracted
