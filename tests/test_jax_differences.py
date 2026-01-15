@@ -26,7 +26,8 @@ class SimpleMLP(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.network(batch)
         loss = torch.mean((output - 2.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 def test_jax_thread_id_alternation():
@@ -144,7 +145,7 @@ def test_jax_update_sign():
                 break
 
     assert param_changed, "Parameters should change (update applied)"
-    assert metrics['loss'] < float('inf'), "Loss should be finite"
+    assert metrics['fitness'] > float('-inf'), "Fitness should be finite"
 
 
 def test_jax_noise_reuse():
@@ -233,7 +234,7 @@ def test_jax_solver_optimizer():
     batch = torch.randn(8, 3, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf'), "Should work with direct learning rate"
+    assert metrics['fitness'] > float('-inf'), "Should work with direct learning rate"
 
 
 def test_compatibility_summary():

@@ -43,15 +43,17 @@ class SimpleMLP(nn.Module):
             is_training: Not used, kept for compatibility
 
         Returns:
-            Dictionary with 'loss' key
+            Dictionary with 'fitness' key
         """
-        # Simple loss: minimize (output - target)^2
+        # Simple fitness: maximize -(output - target)^2 (higher is better)
         # Target is 2.0 for all inputs (matching JAX test)
         target = 2.0
         output = self.network(batch)
         loss = torch.mean((output - target) ** 2)
+        # Fitness is negative loss (higher fitness is better)
+        fitness = -loss
 
-        return {'loss': loss}
+        return {'fitness': fitness}
 
 
 def calculate_fitness(outputs, target=2.0):
@@ -147,10 +149,10 @@ def main():
         model.eval()
         with torch.no_grad():
             validation_output = model(batch, labels=None, is_training=False)
-            validation_loss = validation_output['loss'].item()
+            validation_fitness = validation_output['fitness'].item()
             validation_outputs = model.network(batch)
-            validation_fitness = calculate_fitness(validation_outputs).cpu().numpy()
-            avg_validation_fitness = np.mean(validation_fitness)
+            validation_fitness_calc = calculate_fitness(validation_outputs).cpu().numpy()
+            avg_validation_fitness = np.mean(validation_fitness_calc)
 
         # Training step
         model.train()
@@ -168,10 +170,10 @@ def main():
         # Print every 5 epochs or last epoch
         if (epoch + 1) % 5 == 0 or epoch == 0 or epoch == num_epochs - 1:
             print(f"Epoch {epoch + 1}/{num_epochs}")
-            print(f"  Validation loss: {validation_loss:.6f}")
-            print(f"  Avg validation fitness: {avg_validation_fitness:.6f}")
+            print(f"  Validation fitness: {validation_fitness:.6f}")
+            print(f"  Avg validation fitness (calc): {avg_validation_fitness:.6f}")
             print(f"  Training metrics:")
-            print(f"    Loss: {metrics.get('loss', 'N/A'):.6f}")
+            print(f"    Fitness: {metrics.get('fitness', 'N/A'):.6f}")
             print(f"    Avg fitness: {avg_fitness:.6f}")
             print(f"    Min fitness: {min_fitness:.6f}")
             print(f"    Max fitness: {max_fitness:.6f}")
@@ -200,31 +202,31 @@ def main():
         # Test on multiple random batches
         test_batches = [torch.randn(n_workers, in_dim, device=device) for _ in range(5)]
         all_fitnesses = []
-        all_losses = []
+        all_fitnesses_direct = []
 
         for test_batch in test_batches:
             output = model(test_batch, labels=None, is_training=False)
-            loss = output['loss'].item()
+            fitness = output['fitness'].item()
             outputs = model.network(test_batch)
-            fitness = calculate_fitness(outputs).cpu().numpy()
+            fitness_calc = calculate_fitness(outputs).cpu().numpy()
 
-            all_fitnesses.extend(fitness.tolist())
-            all_losses.append(loss)
+            all_fitnesses.extend(fitness_calc.tolist())
+            all_fitnesses_direct.append(fitness)
 
         avg_final_fitness = np.mean(all_fitnesses)
-        avg_final_loss = np.mean(all_losses)
+        avg_final_fitness_direct = np.mean(all_fitnesses_direct)
         std_final_fitness = np.std(all_fitnesses)
 
-        print(f"  Average final fitness: {avg_final_fitness:.6f} ± {std_final_fitness:.6f}")
-        print(f"  Average final loss: {avg_final_loss:.6f}")
-        print(f"  Target fitness (optimal): 0.0 (loss = 0.0)")
+        print(f"  Average final fitness (calc): {avg_final_fitness:.6f} ± {std_final_fitness:.6f}")
+        print(f"  Average final fitness (direct): {avg_final_fitness_direct:.6f}")
+        print(f"  Target fitness (optimal): 0.0")
         print()
 
-        # Check if model learned something
-        if avg_final_loss < 1.0:
-            print("✓ Model successfully learned! (loss < 1.0)")
+        # Check if model learned something (fitness > -1.0 means loss < 1.0)
+        if avg_final_fitness_direct > -1.0:
+            print("✓ Model successfully learned! (fitness > -1.0)")
         else:
-            print("⚠ Model may need more training (loss >= 1.0)")
+            print("⚠ Model may need more training (fitness <= -1.0)")
 
     print("=" * 60)
 

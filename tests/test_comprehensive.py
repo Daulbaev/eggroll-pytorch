@@ -19,7 +19,8 @@ class SimpleModel(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.linear(batch)
         loss = torch.mean((output - 1.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 class ComplexModel(nn.Module):
@@ -39,7 +40,8 @@ class ComplexModel(nn.Module):
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
         loss = torch.mean((x - 1.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 def test_different_model_sizes():
@@ -63,7 +65,7 @@ def test_different_model_sizes():
         batch = torch.randn(8, in_dim, device=device)
         metrics = trainer.train_step(batch)
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
 
@@ -87,7 +89,7 @@ def test_different_ranks():
         batch = torch.randn(8, 10, device=device)
         metrics = trainer.train_step(batch)
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
 
@@ -111,7 +113,7 @@ def test_different_n_workers():
         batch = torch.randn(n_workers, 5, device=device)
         metrics = trainer.train_step(batch)
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
 
@@ -135,7 +137,7 @@ def test_different_sigma_values():
         batch = torch.randn(8, 5, device=device)
         metrics = trainer.train_step(batch)
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
 
@@ -160,7 +162,7 @@ def test_gradient_clipping_variations():
         batch = torch.randn(8, 5, device=device)
         metrics = trainer.train_step(batch)
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert 'grad_norm' in metrics
 
         if grad_clip is not None:
@@ -189,7 +191,7 @@ def test_normalize_fitness_toggle():
         batch = torch.randn(8, 5, device=device)
         metrics = trainer.train_step(batch)
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
 
@@ -209,18 +211,18 @@ def test_multiple_training_steps():
         base_seed=42,
     )
 
-    losses = []
+    fitnesses = []
     for step in range(10):
         batch = torch.randn(8, 5, device=device)
         metrics = trainer.train_step(batch)
-        losses.append(metrics['loss'])
+        fitnesses.append(metrics['fitness'])
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
     # Check that trainer step counter increased
     assert trainer.step == 10
-    assert len(trainer.loss_history) == 10
+    assert len(trainer.fitness_history) == 10
 
 
 def test_checkpoint_saving():
@@ -266,12 +268,13 @@ def test_invalid_loss_handling():
 
         def forward(self, batch, labels=None, is_training=True):
             output = self.linear(batch)
-            # Sometimes return invalid loss
+            # Sometimes return invalid fitness
             if torch.rand(1).item() < 0.5:
-                loss = torch.tensor(float('inf'))
+                fitness = torch.tensor(float('-inf'))
             else:
                 loss = torch.mean((output - 1.0) ** 2)
-            return {'loss': loss}
+                fitness = -loss  # Higher fitness is better
+            return {'fitness': fitness}
 
     model = BadModel()
     model.to(device)
@@ -289,10 +292,10 @@ def test_invalid_loss_handling():
     batch = torch.randn(16, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    # Should handle invalid losses gracefully
-    # Note: If all samples are invalid, loss might still be inf, but valid_samples should be 0
-    assert metrics['valid_samples'] > 0 or metrics['loss'] < float('inf'), \
-        "Should have at least some valid samples or finite loss"
+    # Should handle invalid fitness gracefully
+    # Note: If all samples are invalid, fitness might still be -inf, but valid_samples should be 0
+    assert metrics['valid_samples'] > 0 or metrics['fitness'] > float('-inf'), \
+        "Should have at least some valid samples or finite fitness"
 
 
 def test_cuda_if_available():
@@ -317,7 +320,7 @@ def test_cuda_if_available():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -329,7 +332,7 @@ def test_eggroll_step_function():
 
     batch = torch.randn(8, 5, device=device)
 
-    loss, metrics = eggroll_step(
+    fitness, metrics = eggroll_step(
         model=model,
         batch=batch,
         device=device,
@@ -341,9 +344,9 @@ def test_eggroll_step_function():
         epoch=0,
     )
 
-    assert isinstance(loss, float)
-    assert loss < float('inf')
-    assert 'loss' in metrics
+    assert isinstance(fitness, float)
+    assert fitness > float('-inf')
+    assert 'fitness' in metrics
     assert 'valid_samples' in metrics
     assert metrics['valid_samples'] > 0
 

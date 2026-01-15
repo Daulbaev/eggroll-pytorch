@@ -21,7 +21,9 @@ class SimpleModel(nn.Module):
 
     def forward(self, batch, labels=None, is_training=True):
         out = self.linear(batch)
-        return {'loss': torch.mean((out - 1.0) ** 2)}
+        loss = torch.mean((out - 1.0) ** 2)
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 def test_thread_alternation_2d_params():

@@ -17,7 +17,8 @@ class SimpleModel(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.linear(batch)
         loss = torch.mean((output - 1.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 def test_global_normalization():
@@ -40,7 +41,7 @@ def test_global_normalization():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -64,7 +65,7 @@ def test_group_normalization():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -89,7 +90,7 @@ def test_group_normalization_different_sizes():
         batch = torch.randn(8, 5, device=device)
         metrics = trainer.train_step(batch)
 
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
 
@@ -172,7 +173,7 @@ def test_group_vs_global_normalization():
     metrics_group, params_group = train_with_group_size(group_size_val=4)
 
     # Results should be different
-    assert abs(metrics_global['loss'] - metrics_group['loss']) > 1e-5, \
+    assert abs(metrics_global['fitness'] - metrics_group['fitness']) > 1e-5, \
         "Group and global normalization should produce different results"
 
     # At least some parameters should be different
@@ -206,7 +207,7 @@ def test_group_normalization_edge_cases():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 

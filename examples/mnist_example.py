@@ -46,7 +46,7 @@ class SimpleMNIST(nn.Module):
             is_training: Not used, kept for compatibility
 
         Returns:
-            Dictionary with 'loss' key (and optionally 'output' key)
+            Dictionary with 'fitness' key (and optionally 'output' key)
         """
         # Extract images and labels from batch if it's a dict
         if isinstance(batch, dict):
@@ -65,14 +65,15 @@ class SimpleMNIST(nn.Module):
         # Forward pass
         output = self.network(images)
 
-        # Compute loss if labels are provided
+        # Compute fitness if labels are provided (fitness = -loss, higher is better)
         if labels is not None:
             loss = F.cross_entropy(output, labels)
+            fitness = -loss  # Higher fitness is better
         else:
-            # If no labels, return dummy loss (shouldn't happen during training)
-            loss = torch.tensor(0.0, device=output.device, requires_grad=False)
+            # If no labels, return dummy fitness (shouldn't happen during training)
+            fitness = torch.tensor(0.0, device=output.device, requires_grad=False)
 
-        return {'loss': loss, 'output': output}
+        return {'fitness': fitness, 'output': output}
 
 
 class ConvMNIST(nn.Module):
@@ -105,7 +106,7 @@ class ConvMNIST(nn.Module):
             is_training: Not used, kept for compatibility
 
         Returns:
-            Dictionary with 'loss' key (and optionally 'output' key)
+            Dictionary with 'fitness' key (and optionally 'output' key)
         """
         # Extract images and labels from batch if it's a dict
         if isinstance(batch, dict):
@@ -128,14 +129,15 @@ class ConvMNIST(nn.Module):
         x = F.relu(self.fc1(x))
         output = self.fc2(x)
 
-        # Compute loss if labels are provided
+        # Compute fitness if labels are provided (fitness = -loss, higher is better)
         if labels is not None:
             loss = F.cross_entropy(output, labels)
+            fitness = -loss  # Higher fitness is better
         else:
-            # If no labels, return dummy loss (shouldn't happen during training)
-            loss = torch.tensor(0.0, device=output.device, requires_grad=False)
+            # If no labels, return dummy fitness (shouldn't happen during training)
+            fitness = torch.tensor(0.0, device=output.device, requires_grad=False)
 
-        return {'loss': loss, 'output': output}
+        return {'fitness': fitness, 'output': output}
 
 
 def load_mnist_data(batch_size=64, data_dir='./data'):
@@ -217,7 +219,8 @@ def evaluate_accuracy(model, data_loader, device):
             # Forward pass
             output_dict = model(images, labels=labels, is_training=False)
             output = output_dict['output']
-            loss = output_dict['loss']
+            fitness = output_dict['fitness']
+            loss = -fitness.item()  # Convert fitness back to loss for reporting
 
             # Get predictions
             _, predicted = torch.max(output.data, 1)
@@ -225,7 +228,7 @@ def evaluate_accuracy(model, data_loader, device):
             # Update statistics
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            total_loss += loss.item()
+            total_loss += loss
             num_batches += 1
 
     accuracy = correct / total
@@ -342,7 +345,10 @@ def main():
 
             # Training step
             metrics = trainer.train_step(batch_for_eggroll)
-            epoch_losses.append(metrics.get('loss', float('inf')))
+            # Convert fitness to loss for reporting (fitness = -loss)
+            train_fitness = metrics.get('fitness', float('-inf'))
+            train_loss = -train_fitness if train_fitness != float('-inf') else float('inf')
+            epoch_losses.append(train_loss)
             num_batches += 1
 
         # Average loss for epoch
@@ -355,6 +361,7 @@ def main():
         if (epoch + 1) % 1 == 0 or epoch == 0 or epoch == num_epochs - 1:
             print(f"Epoch {epoch + 1}/{num_epochs}")
             print(f"  Train loss: {avg_epoch_loss:.4f}")
+            print(f"  Train fitness: {metrics.get('fitness', 'N/A'):.6f}")
             print(f"  Test accuracy: {test_acc * 100:.2f}%")
             print(f"  Test loss: {test_loss:.4f}")
             print(f"  Valid samples: {metrics.get('valid_samples', 'N/A')}")

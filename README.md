@@ -48,7 +48,8 @@ class MyModel(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.net(batch)
         loss = torch.mean((output - 1.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 # Create model and trainer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -72,7 +73,7 @@ trainer = EGGROLLTrainer(
 for epoch in range(100):
     batch = torch.randn(64, 10, device=device)
     metrics = trainer.train_step(batch)
-    print(f"Epoch {epoch}: Loss = {metrics['loss']:.6f}")
+    print(f"Epoch {epoch}: Fitness = {metrics['fitness']:.6f}")
 ```
 
 See `examples/simple_example.py` for a complete working example.
@@ -85,7 +86,7 @@ Main trainer class for EGGROLL optimization.
 
 #### Parameters
 
-- **model** (`nn.Module`): PyTorch model to train. Must have a `forward` method that accepts `(batch, labels=None, is_training=True)` and returns a dict with `'loss'` key.
+- **model** (`nn.Module`): PyTorch model to train. Must have a `forward` method that accepts `(batch, labels=None, is_training=True)` and returns a dict with `'fitness'` key (higher is better).
 
 - **device** (`torch.device`): Device to train on (CPU or CUDA).
 
@@ -99,7 +100,7 @@ Main trainer class for EGGROLL optimization.
 
 - **grad_clip** (`float`, optional, default=1.0): Gradient clipping threshold. Set to `None` to disable.
 
-- **use_weighted_loss** (`bool`, default=False): Whether to use weighted loss (not used in standalone version).
+- **use_weighted_loss** (`bool`, default=False): Whether to use weighted fitness (not used in standalone version).
 
 - **log_steps** (`int`, default=100): Frequency of logging.
 
@@ -137,7 +138,7 @@ Low-level function to perform one EGGROLL optimization step.
 ```python
 from eggroll import eggroll_step
 
-loss, metrics = eggroll_step(
+fitness, metrics = eggroll_step(
     model=model,
     batch=batch,
     device=device,
@@ -164,7 +165,7 @@ where:
 
 - `µ_t` are the current model parameters
 - `E_{i,t} = (1/√r) * A_{i,t} * B_{i,t}^T` is the low-rank perturbation
-- `f(M)` is the fitness function (typically `-loss`)
+- `f(M)` is the fitness function (higher is better)
 - `α_t` is the learning rate
 - `N_workers` is the number of perturbation samples
 - `σ` is the perturbation scale
@@ -185,8 +186,8 @@ where:
 Your PyTorch model must:
 
 1. Have a `forward` method with signature: `forward(batch, labels=None, is_training=True)`
-2. Return a dictionary with at least a `'loss'` key
-3. The loss should be a scalar tensor
+2. Return a dictionary with at least a `'fitness'` key
+3. The fitness should be a scalar tensor (higher is better)
 
 **Example:**
 
@@ -195,7 +196,8 @@ class MyModel(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.network(batch)
         loss = self.loss_fn(output, labels) if labels is not None else self.loss_fn(output)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 ```
 
 ## Differences from JAX Implementation

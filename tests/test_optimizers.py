@@ -17,7 +17,8 @@ class SimpleModel(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.linear(batch)
         loss = torch.mean((output - 1.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 def test_sgd_optimizer():
@@ -43,7 +44,7 @@ def test_sgd_optimizer():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -71,7 +72,7 @@ def test_adam_optimizer():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -99,7 +100,7 @@ def test_adamw_optimizer():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -124,7 +125,7 @@ def test_no_optimizer_default():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -158,7 +159,7 @@ def test_custom_optimizer_instance():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 
@@ -336,7 +337,7 @@ def test_adamw_matching_jax():
     batch = torch.randn(8, 5, device=device)
     metrics = trainer.train_step(batch)
 
-    assert metrics['loss'] < float('inf')
+    assert metrics['fitness'] > float('-inf')
     assert metrics['valid_samples'] > 0
 
 

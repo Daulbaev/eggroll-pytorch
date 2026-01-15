@@ -17,7 +17,8 @@ class SimpleModel(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.linear(batch)
         loss = torch.mean((output - 1.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 def test_noise_reuse_zero():
@@ -144,7 +145,7 @@ def test_noise_reuse_trainer():
     # Train for a few steps
     for step in range(5):
         metrics = trainer.train_step(batch)
-        assert metrics['loss'] < float('inf')
+        assert metrics['fitness'] > float('-inf')
         assert metrics['valid_samples'] > 0
 
 

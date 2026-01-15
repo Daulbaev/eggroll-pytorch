@@ -198,14 +198,14 @@ class PerturbationHookManager:
         self.hooks.clear()
 
 
-def compute_model_loss(
+def compute_model_fitness(
     model: nn.Module,
     batch,
     device: torch.device,
     use_weighted_loss: bool = False
 ) -> torch.Tensor:
     """
-    Compute loss for a model with a batch of data.
+    Compute fitness for a model with a batch of data.
 
     Args:
         model: PyTorch model
@@ -214,7 +214,7 @@ def compute_model_loss(
         use_weighted_loss: Whether to use affinity-based weights (not used in standalone version)
 
     Returns:
-        Scalar loss tensor
+        Scalar fitness tensor (higher is better)
     """
     # Set model to training mode but disable gradient computation
     model.train()
@@ -241,16 +241,16 @@ def compute_model_loss(
             if not has_report_metrics and hasattr(model, 'report_metrics'):
                 delattr(model, 'report_metrics')
 
-        if output is None or 'loss' not in output:
-            return torch.tensor(float('inf'), device=device)
+        if output is None or 'fitness' not in output:
+            return torch.tensor(float('-inf'), device=device)
 
-        loss = output['loss']
+        fitness = output['fitness']
 
-        # Check for invalid loss
-        if not torch.isfinite(loss):
-            return torch.tensor(float('inf'), device=device)
+        # Check for invalid fitness
+        if not torch.isfinite(fitness):
+            return torch.tensor(float('-inf'), device=device)
 
-        return loss
+        return fitness
 
 
 def apply_perturbations_to_model(
@@ -316,7 +316,7 @@ def eggroll_step(
 
     where:
     - E_{i,t} = (1/√r) * A_{i,t} * B_{i,t}^T is the low-rank perturbation
-    - f(M) is the fitness function (in our case: -loss)
+    - f(M) is the fitness function (higher is better)
     - α_t is the learning rate
     - N_workers is the number of perturbation samples per iteration
 
@@ -341,7 +341,7 @@ def eggroll_step(
                     but global std. Must divide n_workers evenly.
 
     Returns:
-        Current loss value and metrics dictionary
+        Current fitness value and metrics dictionary
     """
     # Get all trainable parameters
     trainable_params = {name: param for name, param in model.named_parameters() if param.requires_grad}
@@ -361,7 +361,7 @@ def eggroll_step(
             # For 1D parameters, use full-rank accumulator
             update_accumulator[name] = torch.zeros_like(param)
 
-    sample_losses = []
+    sample_fitnesses = []
     valid_samples = 0
 
     # Store raw fitness values and perturbations for normalization
@@ -445,29 +445,31 @@ def eggroll_step(
             # Apply full perturbations directly (for 1D and multi-dimensional parameters)
             apply_perturbations_to_model(model, full_perturbations_for_direct, sigma, mode='add')
 
-            # Use loss-based fitness
-            loss = compute_model_loss(model, batch, device, use_weighted_loss)
+            # Compute fitness directly from model
+            fitness = compute_model_fitness(model, batch, device, use_weighted_loss)
 
             # Restore original parameters (hooks are already removed by context manager)
             apply_perturbations_to_model(model, full_perturbations_for_direct, sigma, mode='restore')
 
-            # Skip if loss is invalid
-            if not torch.isfinite(loss):
+            # Skip if fitness is invalid
+            if not torch.isfinite(fitness):
                 continue
 
-            # Compute fitness: f_i = -loss (we maximize fitness, minimize loss)
-            fitness = -loss.item()
-            sample_losses.append(loss.item())
+            # Use fitness directly (higher is better)
+            fitness_value = fitness.item()
 
-        # Final check: ensure fitness is valid before using it
-        if not np.isfinite(fitness) or abs(fitness) > 1000.0:
-            print(f"Warning: Invalid fitness {fitness} after all checks, skipping sample")
-            continue
+            # Final check: ensure fitness is valid before using it
+            if not np.isfinite(fitness_value) or abs(fitness_value) > 1000.0:
+                print(f"Warning: Invalid fitness {fitness_value} after all checks, skipping sample")
+                continue
+
+            sample_fitnesses.append(fitness_value)
 
         valid_samples += 1
 
         # Store raw fitness and perturbations for later normalization
-        raw_fitnesses.append(fitness)
+        # Ensure fitness_value is a Python float (not tensor)
+        raw_fitnesses.append(float(fitness_value))
         stored_perturbations.append(perturbations)
 
         # Store low-rank components for valid samples only (for efficient update computation)
@@ -568,9 +570,9 @@ def eggroll_step(
                         update_accumulator[name] += pert * fitness
 
     if valid_samples == 0:
-        # All samples were invalid, return current loss
-        current_loss = compute_model_loss(model, batch, device, use_weighted_loss)
-        return current_loss.item(), {'valid_samples': 0}
+        # All samples were invalid, return current fitness
+        current_fitness = compute_model_fitness(model, batch, device, use_weighted_loss)
+        return current_fitness.item(), {'valid_samples': 0}
 
     # Apply EGGROLL update: µ_{t+1} = µ_t + (α_t / N_workers) * Σ E_i * f_i
     # Matching JAX version: multiply by sqrt(fitnesses.size) before applying learning_rate
@@ -632,12 +634,12 @@ def eggroll_step(
                 else:
                     print(f"Warning: Non-finite update detected for parameter {name}, skipping update")
 
-    # Compute current loss with updated parameters
-    current_loss = compute_model_loss(model, batch, device, use_weighted_loss)
+    # Compute current fitness with updated parameters
+    current_fitness = compute_model_fitness(model, batch, device, use_weighted_loss)
     metrics = {
-        'loss': current_loss.item(),
+        'fitness': current_fitness.item(),
         'valid_samples': valid_samples,
-        'mean_sample_loss': np.mean(sample_losses) if sample_losses else float('inf'),
+        'mean_sample_fitness': np.mean(sample_fitnesses) if sample_fitnesses else float('-inf'),
     }
 
     # Compute update norm (equivalent to gradient norm)
@@ -655,7 +657,7 @@ def eggroll_step(
             total_update_norm += torch.norm(update).item() ** 2
     metrics['grad_norm'] = np.sqrt(total_update_norm)
 
-    return current_loss.item(), metrics
+    return current_fitness.item(), metrics
 
 
 class EGGROLLTrainer:
@@ -736,7 +738,7 @@ class EGGROLLTrainer:
             raise ValueError(f"group_size ({group_size}) must divide n_workers ({n_workers}) evenly")
 
         self.step = 0
-        self.loss_history = []
+        self.fitness_history = []
         self.metrics_history = []
 
         # Move model to device
@@ -787,7 +789,7 @@ class EGGROLLTrainer:
         Returns:
             Dictionary of metrics
         """
-        loss, metrics = eggroll_step(
+        fitness, metrics = eggroll_step(
             self.model,
             batch,
             self.device,
@@ -806,7 +808,7 @@ class EGGROLLTrainer:
         )
 
         self.step += 1
-        self.loss_history.append(loss)
+        self.fitness_history.append(fitness)
         self.metrics_history.append(metrics)
 
         return metrics
@@ -839,7 +841,7 @@ class EGGROLLTrainer:
 
         # Save training state
         # Convert numpy arrays to lists for serialization compatibility
-        loss_history = [float(x) if isinstance(x, (np.ndarray, np.generic)) else x for x in self.loss_history]
+        fitness_history = [float(x) if isinstance(x, (np.ndarray, np.generic)) else x for x in self.fitness_history]
         metrics_history = []
         for metrics in self.metrics_history:
             metrics_dict = {}
@@ -852,7 +854,7 @@ class EGGROLLTrainer:
 
         training_state = {
             'step': self.step,
-            'loss_history': loss_history,
+            'fitness_history': fitness_history,
             'metrics_history': metrics_history,
             'rank': self.rank,
             'sigma': float(self.sigma),

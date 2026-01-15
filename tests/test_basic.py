@@ -18,7 +18,8 @@ class SimpleModel(nn.Module):
     def forward(self, batch, labels=None, is_training=True):
         output = self.linear(batch)
         loss = torch.mean((output - 1.0) ** 2)
-        return {'loss': loss}
+        fitness = -loss  # Higher fitness is better
+        return {'fitness': fitness}
 
 
 def test_trainer_initialization():
@@ -60,9 +61,9 @@ def test_train_step():
     batch = torch.randn(8, 5)
     metrics = trainer.train_step(batch)
 
-    assert 'loss' in metrics
+    assert 'fitness' in metrics
     assert 'valid_samples' in metrics
-    assert isinstance(metrics['loss'], float)
+    assert isinstance(metrics['fitness'], float)
     assert metrics['valid_samples'] > 0
 
 
@@ -73,7 +74,7 @@ def test_eggroll_step():
 
     batch = torch.randn(8, 5)
 
-    loss, metrics = eggroll_step(
+    fitness, metrics = eggroll_step(
         model=model,
         batch=batch,
         device=device,
@@ -85,8 +86,8 @@ def test_eggroll_step():
         epoch=0,
     )
 
-    assert isinstance(loss, float)
-    assert 'loss' in metrics
+    assert isinstance(fitness, float)
+    assert 'fitness' in metrics
     assert 'valid_samples' in metrics
     assert metrics['valid_samples'] > 0
 
@@ -99,9 +100,9 @@ def test_model_forward_interface():
     output = model(batch, labels=None, is_training=True)
 
     assert isinstance(output, dict)
-    assert 'loss' in output
-    assert isinstance(output['loss'], torch.Tensor)
-    assert output['loss'].dim() == 0  # Scalar
+    assert 'fitness' in output
+    assert isinstance(output['fitness'], torch.Tensor)
+    assert output['fitness'].dim() == 0  # Scalar
 
 
 if __name__ == "__main__":
